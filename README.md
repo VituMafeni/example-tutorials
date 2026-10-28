@@ -24,6 +24,7 @@ design.
 | 07 | [MLP on MNIST](07-mlp-mnist-tensorflow/) | TensorFlow | ~3 min |
 | 08 | [Transfer learning: MobileNetV2](08-transfer-learning-mobilenet-tensorflow/) | TensorFlow | ~10 min |
 | 09 | [NLP text classification](09-nlp-text-classification-tensorflow/) | TensorFlow | ~6 min |
+| 10 | [Training and saving a model on MNIST](10-mnist-checkpoint-pytorch/) | PyTorch | ~10–15 min |
 
 Launch using any GPU-enabled kernel of the listed framework that's
 available to you — this guide doesn't assume a particular GPU
