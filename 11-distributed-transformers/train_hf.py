@@ -6,6 +6,7 @@ file runs under python, torchrun, deepspeed and accelerate with no code changes.
 DeepSpeed is switched on purely from the CLI:  --deepspeed ds_zero2.json
 """
 import os
+import sys
 from dataclasses import dataclass
 
 from datasets import DownloadConfig, load_dataset
@@ -24,6 +25,15 @@ class DataArgs:
 
 def main():
     data_args, targs = HfArgumentParser((DataArgs, TrainingArguments)).parse_args_into_dataclasses()
+    output_dir_was_set = any(
+        arg == "--output_dir" or arg.startswith("--output_dir=")
+        for arg in sys.argv[1:]
+    )
+    if not output_dir_was_set:
+        targs.output_dir = os.environ.get(
+            "CNLAB_OUTPUT_DIR",
+            os.path.join(os.path.expanduser("~"), "outputs/gpt2-hf"),
+        )
     set_seed(targs.seed)
 
     tokenizer = AutoTokenizer.from_pretrained(
