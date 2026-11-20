@@ -8,7 +8,7 @@ DeepSpeed is switched on purely from the CLI:  --deepspeed ds_zero2.json
 import os
 from dataclasses import dataclass
 
-from datasets import load_dataset
+from datasets import DownloadConfig, load_dataset
 from transformers import (AutoModelForCausalLM, AutoTokenizer, DataCollatorForLanguageModeling,
                           HfArgumentParser, Trainer, TrainingArguments, set_seed)
 
@@ -19,17 +19,24 @@ class DataArgs:
     dataset_name: str = "Salesforce/wikitext"
     dataset_config: str = "wikitext-2-raw-v1"
     block_size: int = 512
+    offline: bool = False
 
 
 def main():
     data_args, targs = HfArgumentParser((DataArgs, TrainingArguments)).parse_args_into_dataclasses()
     set_seed(targs.seed)
 
-    tokenizer = AutoTokenizer.from_pretrained(data_args.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(
+        data_args.model_name, local_files_only=data_args.offline
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    raw = load_dataset(data_args.dataset_name, data_args.dataset_config)
+    raw = load_dataset(
+        data_args.dataset_name,
+        data_args.dataset_config,
+        download_config=DownloadConfig(local_files_only=data_args.offline),
+    )
     bs = data_args.block_size
 
     def tok(batch):
@@ -46,7 +53,9 @@ def main():
         tokenized = raw.map(tok, batched=True, remove_columns=cols)
         lm = tokenized.map(group, batched=True, remove_columns=tokenized["train"].column_names)
 
-    model = AutoModelForCausalLM.from_pretrained(data_args.model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        data_args.model_name, local_files_only=data_args.offline
+    )
 
     trainer = Trainer(
         model=model,

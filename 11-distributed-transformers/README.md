@@ -42,6 +42,37 @@ pip install deepspeed   # only needed for section 3; not in the image
 The scripts download `gpt2` and `Salesforce/wikitext` from the Hugging Face
 Hub, so the pod needs outbound internet access.
 
+If the pod reports `Temporary failure in name resolution` while requesting
+`huggingface.co`, this is an outbound DNS/network issue, not a GPU or DDP
+failure. Restore outbound access for the pod, or stage the model and dataset
+cache on a machine that has internet access. For the latter, use the same
+Hugging Face cache directory on both machines:
+
+```bash
+# On a machine with internet access
+export HF_HOME="$PWD/hf-cache"
+python - <<'PY'
+from datasets import load_dataset
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+AutoTokenizer.from_pretrained("gpt2").save_pretrained("models/gpt2")
+AutoModelForCausalLM.from_pretrained("gpt2").save_pretrained("models/gpt2")
+load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1")
+PY
+```
+
+Copy `hf-cache/` and `models/gpt2/` to the pod, then run with those files
+mounted or copied locally:
+
+```bash
+export HF_HOME=/path/to/hf-cache
+python train_ddp.py --model /path/to/models/gpt2 --bf16 --offline
+python train_hf.py --model_name /path/to/models/gpt2 --offline
+```
+
+The `[c10d] The hostname of the client socket cannot be retrieved` warning is
+separate; the traceback here is caused by the unavailable Hugging Face Hub.
+
 Shared Trainer arguments, to keep the commands short:
 
 ```bash

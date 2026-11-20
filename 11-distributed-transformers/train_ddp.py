@@ -15,7 +15,7 @@ from contextlib import nullcontext
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from datasets import load_dataset
+from datasets import DownloadConfig, load_dataset
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 from transformers import AutoModelForCausalLM, AutoTokenizer, get_cosine_schedule_with_warmup
@@ -26,6 +26,8 @@ def parse_args():
     p.add_argument("--model", default="gpt2")
     p.add_argument("--dataset", default="Salesforce/wikitext")
     p.add_argument("--dataset_config", default="wikitext-2-raw-v1")
+    p.add_argument("--offline", action="store_true",
+                   help="use only locally cached or local model and dataset files")
     p.add_argument("--block_size", type=int, default=512)
     p.add_argument("--epochs", type=int, default=1)
     p.add_argument("--per_device_batch_size", type=int, default=8)
@@ -46,7 +48,11 @@ def parse_args():
 
 
 def build_blocks(args, tokenizer):
-    raw = load_dataset(args.dataset, args.dataset_config)
+    raw = load_dataset(
+        args.dataset,
+        args.dataset_config,
+        download_config=DownloadConfig(local_files_only=args.offline),
+    )
 
     def tok(batch):
         return tokenizer(batch["text"])
@@ -91,7 +97,7 @@ def run(rank, local_rank, world_size, args):
     torch.manual_seed(args.seed)  # same seed => identical init on all ranks
     is_main = rank == 0
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, local_files_only=args.offline)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -110,7 +116,7 @@ def run(rank, local_rank, world_size, args):
     val_loader = DataLoader(data["validation"], batch_size=args.per_device_batch_size,
                             sampler=val_sampler, collate_fn=collate)
 
-    model = AutoModelForCausalLM.from_pretrained(args.model)
+    model = AutoModelForCausalLM.from_pretrained(args.model, local_files_only=args.offline)
     if args.grad_checkpointing:
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
